@@ -9,6 +9,22 @@ cap = cv2.VideoCapture(esp32)  # Usar 0 para la cámara predeterminada
 M = None  # Matriz de transformación (se calculará solo una vez)
 width, height = 400, 600  # Dimensiones deseadas para la hoja transformada
 
+
+def detectar_circulos(gray):
+    """Detecta círculos negros en la imagen (marcas de esquina)."""
+    circles = None
+    circles = cv2.HoughCircles(
+        gray, cv2.HOUGH_GRADIENT, dp=1.2, minDist=50,
+        param1=50, param2=30, minRadius=5, maxRadius=30
+    )
+
+    if circles is not None:
+        circles = np.uint16(np.around(circles))
+        return circles[0, :]  # Regresar los círculos detectados
+
+    return []
+
+
 while True:
     # Leer un frame del video
     ret, frame = cap.read()
@@ -21,34 +37,29 @@ while True:
         # Convertir a escala de grises
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Aplicar un desenfoque para reducir el ruido
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        # Detectar círculos (marcas en esquinas)
+        circles = detectar_circulos(gray)
 
-        # Detectar bordes con Canny
-        edges = cv2.Canny(blurred, 50, 150)
+        # Verificar si se detectaron al menos 4 círculos
+        if len(circles) >= 4:
+            # Ordenar las esquinas en sentido arriba-izquierda, arriba-derecha, abajo-derecha, abajo-izquierda
+            sorted_circles = sorted(circles, key=lambda c: (c[1], c[0]))  # Ordenar por Y y luego X
+            pts = np.array([c[:2] for c in sorted_circles[:4]], dtype="float32")  # Tomar las primeras 4 coordenadas
 
-        # Encontrar contornos
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # Puntos de destino para la transformación
+            dst = np.array([
+                [0, 0],
+                [width - 1, 0],
+                [width - 1, height - 1],
+                [0, height - 1]
+            ], dtype="float32")
 
-        if contours:
-            largest_contour = max(contours, key=cv2.contourArea)
-            epsilon = 0.02 * cv2.arcLength(largest_contour, True)
-            approx = cv2.approxPolyDP(largest_contour, epsilon, True)
+            # Calcular la matriz de transformación solo una vez
+            M = cv2.getPerspectiveTransform(pts, dst)
 
-            # Verificar si el contorno tiene 4 esquinas (es un cuadrilátero)
-            if len(approx) == 4:
-                pts = np.array([point[0] for point in approx], dtype="float32")
-
-                # Puntos de destino para la transformación
-                dst = np.array([
-                    [0, 0],
-                    [width - 1, 0],
-                    [width - 1, height - 1],
-                    [0, height - 1]
-                ], dtype="float32")
-
-                # Calcular la matriz de transformación solo una vez
-                M = cv2.getPerspectiveTransform(pts, dst)
+            # Dibujar los círculos detectados en la imagen
+            for (x, y, r) in circles:
+                cv2.circle(frame, (x, y), r, (0, 255, 0), 2)
 
     # Si la transformación ya fue calculada, aplicarla directamente
     if M is not None:
