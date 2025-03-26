@@ -78,19 +78,39 @@ def ordenar_esquinas(coordenadas):
     ], dtype="float32")
 
 
-# Hacer que el ancho sea proporcional a la realidad (resta de coordenadas)
-def calcular_transformacion_frontal(pts, nuevo_ancho=1000, nuevo_alto=1000):
-    """ Calcula la matriz de transformación para generar una vista de frente. """
+def distancia(p1, p2):
+    """Calcula la distancia Euclidiana entre dos puntos"""
+    return np.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
+
+
+def calcular_transformacion_frontal(pts, nuevo_ancho=1000, nuevo_alto=800):
+    """ Calcula la matriz de transformación para generar una vista de frente, ajustando el tamaño real del marcador y recortando la parte inferior """
+
+    # Obtener las esquinas del marcador
+    esquina_superior_izquierda = pts[0]
+    esquina_superior_derecha = pts[1]
+    esquina_inferior_derecha = pts[2]
+    esquina_inferior_izquierda = pts[3]
+
+    # Calcular el ancho y el alto reales del marcador usando la distancia euclidiana
+    ancho_real = distancia(esquina_superior_izquierda, esquina_superior_derecha)
+    alto_real = distancia(esquina_superior_izquierda, esquina_inferior_izquierda)
+
+    # Ajustar las coordenadas de destino para aplicar la transformación
     dst = np.array([
         [0, 0],  # Superior izquierda
-        [nuevo_ancho - 1, 0],  # Superior derecha
-        [nuevo_ancho - 1, nuevo_alto - 1],  # Inferior derecha
-        [0, nuevo_alto - 1]  # Inferior izquierda
+        [ancho_real - 1, 0],  # Superior derecha
+        [ancho_real - 1, alto_real - 1],  # Inferior derecha
+        [0, alto_real - 1]  # Inferior izquierda
     ], dtype="float32")
 
+    # Calcular la matriz de transformación
     M = cv2.getPerspectiveTransform(pts, dst)
 
-    return M, (nuevo_ancho, nuevo_alto)
+    # Aplicar la transformación de perspectiva (esto se hace afuera de la función principal)
+    size = (int(ancho_real), int(alto_real))
+
+    return M, size, (nuevo_ancho, nuevo_alto)
 
 
 def transformar_perspectiva(frame, coordenadas, corners):
@@ -99,28 +119,20 @@ def transformar_perspectiva(frame, coordenadas, corners):
     if coordenadas is not None and len(coordenadas) == 4:
         pts = ordenar_esquinas(coordenadas)
         if pts is not None:
-            M, size = calcular_transformacion_frontal(pts)
+            M, size, dimensiones_reales = calcular_transformacion_frontal(pts)
             ultima_transformacion = (M, size)  # Guardar transformación válida
+            print(f"Tamaño real del marcador: {dimensiones_reales} (Ancho, Alto)")
 
     if ultima_transformacion is not None:
         M, size = ultima_transformacion
         transformed = cv2.warpPerspective(frame, M, size)
 
-        # Rotar la imagen transformada 90 grados a la derecha
-        # Centro de la imagen
-        center = (size[0] // 2, size[1] // 2)
-        # Crear la matriz de rotación
-        M_rotacion = cv2.getRotationMatrix2D(center, -90, 1)  # -45 para rotar a la derecha
-        # Aplicar la rotación
-        rotated = cv2.warpAffine(transformed, M_rotacion, size)
+        # Aplicar la rotación al video completo
+        rotated = cv2.transpose(transformed)  # Transponer la imagen para rotarla 90 grados
 
-        # Darle vuelta en espejo (reflejar la imagen)
-        mirrored = cv2.flip(rotated, 1)  # 1 para reflejar horizontalmente (espejo)
-        return mirrored
+        return rotated
 
     return None
-
-
 
 
 # Inicializar la captura de video
