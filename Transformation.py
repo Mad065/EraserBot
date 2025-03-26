@@ -78,8 +78,8 @@ def ordenar_esquinas(coordenadas):
     ], dtype="float32")
 
 
-
-def calcular_transformacion_frontal(pts, nuevo_ancho=600, nuevo_alto=400):
+# Hacer que el ancho sea proporcional a la realidad (resta de coordenadas)
+def calcular_transformacion_frontal(pts, nuevo_ancho=1000, nuevo_alto=1000):
     """ Calcula la matriz de transformación para generar una vista de frente. """
     dst = np.array([
         [0, 0],  # Superior izquierda
@@ -94,7 +94,6 @@ def calcular_transformacion_frontal(pts, nuevo_ancho=600, nuevo_alto=400):
 
 
 def transformar_perspectiva(frame, coordenadas, corners):
-    """ Aplica la transformación de perspectiva para mostrar una vista de frente. """
     global ultima_transformacion
 
     if coordenadas is not None and len(coordenadas) == 4:
@@ -107,15 +106,21 @@ def transformar_perspectiva(frame, coordenadas, corners):
         M, size = ultima_transformacion
         transformed = cv2.warpPerspective(frame, M, size)
 
-        # Dibujar los ArUco en la imagen transformada
-        if corners is not None:
-            for marker in corners:
-                puntos_transformados = cv2.perspectiveTransform(marker, M)
-                cv2.polylines(transformed, [np.int32(puntos_transformados)], True, (0, 255, 0), 2)
+        # Rotar la imagen transformada 90 grados a la derecha
+        # Centro de la imagen
+        center = (size[0] // 2, size[1] // 2)
+        # Crear la matriz de rotación
+        M_rotacion = cv2.getRotationMatrix2D(center, -90, 1)  # -45 para rotar a la derecha
+        # Aplicar la rotación
+        rotated = cv2.warpAffine(transformed, M_rotacion, size)
 
-        return transformed
+        # Darle vuelta en espejo (reflejar la imagen)
+        mirrored = cv2.flip(rotated, 1)  # 1 para reflejar horizontalmente (espejo)
+        return mirrored
 
     return None
+
+
 
 
 # Inicializar la captura de video
