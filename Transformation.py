@@ -33,6 +33,7 @@ def detectar_aruco(frame):
     return None, frame, None
 
 
+# Corregir orientacion
 def ordenar_esquinas(coordenadas):
     """ Ordena los 4 puntos de ArUco en el orden:
         [esquina superior izquierda, superior derecha, inferior derecha, inferior izquierda]
@@ -40,25 +41,42 @@ def ordenar_esquinas(coordenadas):
     if len(coordenadas) != 4:
         return None
 
-    # Obtener los centros de cada marcador
-    centros = {id_marker: np.mean(puntos, axis=0) for id_marker, puntos in coordenadas.items()}
+    # Inicializamos listas para las coordenadas de las esquinas
+    esquina_superior_izquierda = None
+    esquina_superior_derecha = None
+    esquina_inferior_derecha = None
+    esquina_inferior_izquierda = None
 
-    # Convertir en lista y ordenar por coordenada Y (de arriba a abajo)
-    centros_ordenados = sorted(centros.items(), key=lambda x: x[1][1])
+    # Iteramos solo sobre los valores (las coordenadas) del diccionario
+    for id_marker, puntos in coordenadas.items():
+        for punto in puntos:  # puntos es un array con 4 coordenadas
+            # Verificar que cada punto sea un arreglo con 2 valores (x, y)
+            if isinstance(punto, np.ndarray) and punto.shape[0] == 2:
+                x, y = punto[0], punto[1]
+            elif isinstance(punto, list) and len(punto) == 2:
+                x, y = punto[0], punto[1]
+            else:
+                print("Error: cada punto debe ser un arreglo con 2 valores (x, y).")
+                return None
 
-    # Las dos primeras son las superiores, las dos últimas son las inferiores
-    arriba = sorted(centros_ordenados[:2], key=lambda x: x[1][0])  # Ordenar por X (izq a der)
-    abajo = sorted(centros_ordenados[2:], key=lambda x: x[1][0])  # Ordenar por X (izq a der)
+            # Determinamos las esquinas según las condiciones de los valores de x, y
+            if esquina_superior_izquierda is None or (x + y) < (esquina_superior_izquierda[0] + esquina_superior_izquierda[1]):
+                esquina_superior_izquierda = (x, y)
+            if esquina_superior_derecha is None or (x - y) < (esquina_superior_derecha[0] - esquina_superior_derecha[1]):
+                esquina_superior_derecha = (x, y)
+            if esquina_inferior_derecha is None or (x + y) > (esquina_inferior_derecha[0] + esquina_inferior_derecha[1]):
+                esquina_inferior_derecha = (x, y)
+            if esquina_inferior_izquierda is None or (x - y) > (esquina_inferior_izquierda[0] - esquina_inferior_izquierda[1]):
+                esquina_inferior_izquierda = (x, y)
 
-    # Obtener los puntos en el orden correcto
-    orden_final = [
-        coordenadas[arriba[0][0]],  # Superior izquierda
-        coordenadas[arriba[1][0]],  # Superior derecha
-        coordenadas[abajo[1][0]],  # Inferior derecha
-        coordenadas[abajo[0][0]],  # Inferior izquierda
-    ]
+    # Devolver las esquinas en el orden correcto
+    return np.array([
+        esquina_superior_izquierda,  # Superior izquierda
+        esquina_superior_derecha,    # Superior derecha
+        esquina_inferior_derecha,    # Inferior derecha
+        esquina_inferior_izquierda   # Inferior izquierda
+    ], dtype="float32")
 
-    return np.array([p[0] for p in orden_final], dtype="float32")
 
 
 def calcular_transformacion_frontal(pts, nuevo_ancho=600, nuevo_alto=400):
