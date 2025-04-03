@@ -7,6 +7,7 @@ PARAMS = cv2.aruco.DetectorParameters()
 ultima_transformacion = None  # Guarda la última transformación válida
 
 
+# Detectar ArUco markers
 def detectar_aruco(frame):
     """ Detecta ArUco markers en un frame y devuelve sus coordenadas. """
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -15,7 +16,8 @@ def detectar_aruco(frame):
     # Detectar ArUco markers
     corners, ids, _ = detector.detectMarkers(gray)
 
-    if ids is not None and len(ids) >= 4:
+    # Cantidad de aruco detectados
+    if ids is not None and len(ids) >= 1:
         coordenadas = {}
         for i in range(len(ids)):
             id_marker = ids[i][0]
@@ -28,9 +30,9 @@ def detectar_aruco(frame):
             cv2.putText(frame, str(id_marker), (centro_x, centro_y),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
-        return coordenadas, frame, corners
+        return coordenadas, frame, corners, ids
 
-    return None, frame, None
+    return None, frame, None, None
 
 
 # Corregir orientacion
@@ -78,11 +80,13 @@ def ordenar_esquinas(coordenadas):
     ], dtype="float32")
 
 
+# Calcular distancia entre 2 puntos
 def distancia(p1, p2):
     """Calcula la distancia Euclidiana entre dos puntos"""
     return np.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
 
 
+# Calcular la transformacion frontal
 def calcular_transformacion_frontal(pts, nuevo_ancho=1000, nuevo_alto=800):
     """ Calcula la matriz de transformación para generar una vista de frente, ajustando el tamaño real del marcador y recortando la parte inferior """
 
@@ -104,15 +108,16 @@ def calcular_transformacion_frontal(pts, nuevo_ancho=1000, nuevo_alto=800):
         [0, alto_real - 1]  # Inferior izquierda
     ], dtype="float32")
 
-    # Calcular la matriz de transformación
+    # Matriz de transformación
     M = cv2.getPerspectiveTransform(pts, dst)
 
-    # Aplicar la transformación de perspectiva (esto se hace afuera de la función principal)
+    # Aplicar la transformación de perspectiva
     size = (int(ancho_real), int(alto_real))
 
     return M, size, (nuevo_ancho, nuevo_alto)
 
 
+# Transformar perspectiva del video
 def transformar_perspectiva(frame, coordenadas, corners):
     global ultima_transformacion
 
@@ -133,33 +138,3 @@ def transformar_perspectiva(frame, coordenadas, corners):
         return rotated
 
     return None
-
-
-# Inicializar la captura de video
-cap = cv2.VideoCapture(1)  # Cambia a la ruta del video si no usas webcam
-
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-        print("Error al capturar el frame")
-        break
-
-    # Detectar los ArUco markers
-    coordenadas, frame_con_aruco, corners = detectar_aruco(frame)
-
-    # Aplicar la transformación de perspectiva
-    imagen_transformada = transformar_perspectiva(frame, coordenadas, corners)
-
-    # Mostrar los resultados
-    cv2.imshow("Detección de ArUco", frame_con_aruco)
-
-    if imagen_transformada is not None:
-        cv2.imshow("Transformación de Perspectiva", imagen_transformada)
-
-    # Salir con la tecla 'q'
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Liberar recursos
-cap.release()
-cv2.destroyAllWindows()

@@ -1,65 +1,49 @@
 import cv2
 import numpy as np
 
-# Inicializar la cámara
-cap = cv2.VideoCapture(0)  # Usar 0 para la cámara predeterminada
+# Recibir los frames del video ya transformado detectar el aruco 0 y despues hacer tracking con este
+def tracking(frame, coordenadas, ids):
+    coordenada_aruco = None
+    id_aruco = None
 
-# Crear una imagen en blanco para dibujar la trayectoria
-trajectory_image = np.ones((480, 640, 3), dtype=np.uint8) * 255  # Fondo blanco
+    # Obtener el aruco con id 0
+    if ids is not None:
+        for i in range(len(ids)):
+            if ids[i][0] == 0:
+                coordenada_aruco = coordenadas[i]
+                id_aruco = ids[i][0]
+                break
 
-# Lista para almacenar las coordenadas de la trayectoria
-trajectory_points = []
+    # Lista para almacenar la trayectoria del objeto
+    trayectoria = []
 
-while True:
-    # Leer un frame del video
-    ret, frame = cap.read()
-    if not ret:
-        break
+    # Tracking
+    if id_aruco == 0 and coordenada_aruco is not None:
+        # Crear el tracker
+        tracker = cv2.TrackerMIL.create()
+        print("crear tracker")
 
-    # Convertir a espacio de color HSV para segmentación por color
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        # Crear un rectángulo delimitador
+        bbox = cv2.boundingRect(np.array(coordenada_aruco))
 
-    # Definir el rango de color para la marca (ajusta estos valores según tu marca)
-    lower_color = np.array([25, 50, 50])  # Valores HSV mínimos (verde claro)
-    upper_color = np.array([85, 255, 255])  # Valores HSV máximos (verde oscuro)
+        # Inicializar el tracker
+        tracker.init(frame, bbox)
 
-    # Crear una máscara para la marca
-    mask = cv2.inRange(hsv, lower_color, upper_color)
+        # Actualizar el tracker
+        success, bbox = tracker.update(frame)
 
-    # Encontrar contornos en la máscara
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if success:
+            x, y, w, h = [int(i) for i in bbox]
 
-    # Si se detecta al menos un contorno
-    if contours:
-        # Encontrar el contorno más grande (asumimos que es la marca)
-        largest_contour = max(contours, key=cv2.contourArea)
+            # Guardar el centro del objeto (como coordenada de la trayectoria)
+            centro = (x + w // 2, y + h // 2)
+            trayectoria.append(centro)
 
-        # Obtener el centro de la marca
-        M = cv2.moments(largest_contour)
-        if M["m00"] != 0:
-            cx = int(M["m10"] / M["m00"])
-            cy = int(M["m01"] / M["m00"])
+            # Dibujar la trayectoria
+            for i in range(1, len(trayectoria)):
+                cv2.line(frame, trayectoria[i-1], trayectoria[i], (255, 0, 0), 2)  # Azul, grosor 2
 
-            # Guardar las coordenadas del centro
-            trajectory_points.append((cx, cy))
+            return frame
+        return frame
 
-            # Dibujar un círculo en la posición actual de la marca
-            cv2.circle(frame, (cx, cy), 5, (0, 255, 0), -1)
-
-    # Dibujar la trayectoria sobre el fondo blanco
-    for i in range(1, len(trajectory_points)):
-        cv2.line(trajectory_image, trajectory_points[i - 1], trajectory_points[i], (0, 0, 255), 2)
-
-    # Mostrar el frame original con la marca detectada
-    cv2.imshow("Frame", frame)
-
-    # Mostrar la trayectoria sobre el fondo blanco
-    cv2.imshow("Trayectoria", trajectory_image)
-
-    # Salir con la tecla 'q'
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Liberar recursos
-cap.release()
-cv2.destroyAllWindows()
+    return frame
