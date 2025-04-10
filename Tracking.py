@@ -6,7 +6,7 @@ def tracking(frame, coordenadas, ids):
     coordenada_aruco = None
     id_aruco = None
 
-    # Obtener el aruco con id 0
+    # Obtener el aruco con el id 0
     if ids is not None:
         for i in range(len(ids)):
             if ids[i][0] == 0:
@@ -35,6 +35,7 @@ def tracking(frame, coordenadas, ids):
         if success:
             x, y, w, h = [int(i) for i in bbox]
 
+            # TODO revisar por que no se dibuja la trayectoria (dibujar la trayectoria en una imagen vacia)
             # Guardar el centro del objeto (como coordenada de la trayectoria)
             centro = (x + w // 2, y + h // 2)
             trayectoria.append(centro)
