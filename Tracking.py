@@ -1,50 +1,44 @@
 import cv2
 import numpy as np
 
+tracker = None
+trayectoria = []
+inicializado = False
+
+
 # Recibir los frames del video ya transformado detectar el aruco 0 y despues hacer tracking con este
 def tracking(frame, coordenadas, ids):
-    coordenada_aruco = None
-    id_aruco = None
+    global tracker, trayectoria, inicializado
 
-    # Obtener el aruco con el id 0
-    if ids is not None:
-        for i in range(len(ids)):
-            if ids[i][0] == 0:
-                coordenada_aruco = coordenadas[i]
-                id_aruco = ids[i][0]
-                break
+    if not inicializado:
+        # Buscar el ArUco con ID 0
+        coordenada_aruco = None
+        if ids is not None:
+            for i in range(len(ids)):
+                if ids[i][0] == 0:
+                    coordenada_aruco = coordenadas[i]
+                    break
 
-    # Lista para almacenar la trayectoria del objeto
-    trayectoria = []
+        if coordenada_aruco is not None:
+            tracker = cv2.TrackerMIL.create()
+            bbox = cv2.boundingRect(np.array(coordenada_aruco))
+            tracker.init(frame, bbox)
+            inicializado = True
 
-    # Tracking
-    if id_aruco == 0 and coordenada_aruco is not None:
-        # Crear el tracker
-        tracker = cv2.TrackerMIL.create()
-        print("crear tracker")
-
-        # Crear un rectángulo delimitador
-        bbox = cv2.boundingRect(np.array(coordenada_aruco))
-
-        # Inicializar el tracker
-        tracker.init(frame, bbox)
-
-        # Actualizar el tracker
+    if inicializado and tracker is not None:
         success, bbox = tracker.update(frame)
 
         if success:
             x, y, w, h = [int(i) for i in bbox]
-
-            # TODO revisar por que no se dibuja la trayectoria (dibujar la trayectoria en una imagen vacia)
-            # Guardar el centro del objeto (como coordenada de la trayectoria)
             centro = (x + w // 2, y + h // 2)
             trayectoria.append(centro)
 
-            # Dibujar la trayectoria
+            # Dibujar trayectoria
             for i in range(1, len(trayectoria)):
-                cv2.line(frame, trayectoria[i-1], trayectoria[i], (255, 0, 0), 2)  # Azul, grosor 2
+                cv2.line(frame, trayectoria[i-1], trayectoria[i], (255, 0, 0), 2)
+                print("dibujar trayectoria")
 
-            return frame
-        return frame
+            # Dibujar bbox
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
     return frame
