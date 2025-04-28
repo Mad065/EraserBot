@@ -10,6 +10,8 @@ inicializado = False
 def tracking(frame, coordenadas, ids):
     global tracker, trayectoria, inicializado
 
+    frame_blank = np.ones_like(frame) * 255
+
     if not inicializado:
         # Buscar el ArUco con ID 0
         coordenada_aruco = None
@@ -33,13 +35,17 @@ def tracking(frame, coordenadas, ids):
             centro = (x + w // 2, y + h // 2)
             trayectoria.append(centro)
 
-            # Dibujar trayectoria
-            # TODO Hacer que se dibuje en un panel blanco y devolver frame con video y otro con panel blanco
+            # Dibujar trayectoria en frame original
             for i in range(1, len(trayectoria)):
                 cv2.line(frame, trayectoria[i-1], trayectoria[i], (255, 0, 0), 2)
-                print("dibujar trayectoria")
+                print("dibujar trayectoria en frame original")
+
+            # Dibujar trayectoria en frame blanco
+            for i in range(1, len(trayectoria)):
+                cv2.line(frame_blank, trayectoria[i-1], trayectoria[i], (255, 0, 0), 2)
+                print("dibujar trayectoria en frame blanco")
 
             # Dibujar bbox
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-    return frame
+    return frame, frame_blank

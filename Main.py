@@ -9,6 +9,7 @@ from kivy.uix.label import Label
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.dropdown import DropDown
 from kivy.uix.button import Button
+from kivy.graphics.texture import Texture
 from kivy.clock import Clock
 
 # TODO Custom buttons
@@ -25,6 +26,7 @@ class EraserBotApp(App):
         self.fps = None
         self.fps_button = None
         self.cam_button = None
+        self.display = None
 
     def build(self):
         Window.size = (800, 600)
@@ -35,14 +37,13 @@ class EraserBotApp(App):
         self.cam = 1
         self.cap = cv2.VideoCapture(self.cam)
         self.fps = 30
+        self.display = False
 
         Clock.schedule_interval(self.update_img, 1.0 / self.fps)
 
-        # TODO Agregar panel de configuracion (tal vez)
         main_layout = BoxLayout(orientation="vertical")
         head_layout = BoxLayout(orientation="horizontal")
         controls_layout = BoxLayout(orientation="horizontal")
-        # TODO Agregar a los controles "iniciar", "pausar", "detener", "captura", "borrar", "presentar" (al detener y hacer captura guardar en el dispositivo)
 
         # Elementos para el head
         fps_dropdown = DropDown()
@@ -128,17 +129,33 @@ class EraserBotApp(App):
 
 
     def update_img(self):
-        # TODO Aplicar logica para actualizar self.img
         if self.cap.isOpened():
             ret, frame = self.cap.read()
             if not ret:
                 print("Error al capturar el frame")
 
-            # Detectar los ArUco markers
+            # Detectar los ArUco markers de las esquinas
             coordenadas, frame_con_aruco, corners, ids = Transformation.detectar_aruco(frame)
 
-            # Tracking de los arUco
-            frame_tracking = Tracking.tracking(frame, coordenadas, ids)
+            # Aplicar la transformación de perspectiva
+            imagen_transformada = Transformation.transformar_perspectiva(frame, coordenadas, corners)
+
+            # Volver a detectar los aruco en la imagen ya transformada
+            coordenadas, frame_con_aruco, corners, ids = Transformation.detectar_aruco_id(imagen_transformada, 0)
+
+            # Tracking del ArUco
+            frame_tracking, frame_blank = Tracking.tracking(frame_con_aruco, coordenadas, ids)
+
+            # Crear una textura
+            if self.display:
+                texture = Texture.create(size=(frame_blank.shape[1], frame_blank.shape[0]), colorfmt='rgb')
+                texture.blit_buffer(frame_blank.flatten(), colorfmt='rgb', bufferfmt='ubyte')
+            else:
+                texture = Texture.create(size=(frame_tracking.shape[1], frame_tracking.shape[0]), colorfmt='rgb')
+                texture.blit_buffer(frame_tracking.flatten(), colorfmt='rgb', bufferfmt='ubyte')
+
+
+            self.img.texture = texture
 
     def update_fps(self, fps):
         # Establecer texto en fps_button
