@@ -34,6 +34,7 @@ def tracking(frame, coordenadas, ids):
             trayectoria.append(centro)
 
             # Dibujar trayectoria
+            # TODO Hacer que se dibuje en un panel blanco y devolver frame con video y otro con panel blanco
             for i in range(1, len(trayectoria)):
                 cv2.line(frame, trayectoria[i-1], trayectoria[i], (255, 0, 0), 2)
                 print("dibujar trayectoria")
