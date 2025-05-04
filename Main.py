@@ -31,6 +31,8 @@ class EraserBotApp(App):
 
         # Video
         self.img = None
+        self.frame_tracking = None
+        self.frame_blank = None
 
         # Variables
         self.cam = None
@@ -122,15 +124,15 @@ class EraserBotApp(App):
             coordenadas, frame_con_aruco, corners, ids = Transformation.detectar_aruco_id(imagen_transformada, 0)
 
             # Tracking del ArUco
-            frame_tracking, frame_blank = Tracking.tracking(frame_con_aruco, coordenadas, ids)
+            self.frame_tracking, self.frame_blank = Tracking.tracking(frame_con_aruco, coordenadas, ids)
 
             # Crear una textura
             if self.display:
-                texture = Texture.create(size=(frame_blank.shape[1], frame_blank.shape[0]), colorfmt='rgb')
-                texture.blit_buffer(frame_blank.flatten(), colorfmt='rgb', bufferfmt='ubyte')
+                texture = Texture.create(size=(self.frame_blank.shape[1], self.frame_blank.shape[0]), colorfmt='rgb')
+                texture.blit_buffer(self.frame_blank.flatten(), colorfmt='rgb', bufferfmt='ubyte')
             else:
-                texture = Texture.create(size=(frame_tracking.shape[1], frame_tracking.shape[0]), colorfmt='rgb')
-                texture.blit_buffer(frame_tracking.flatten(), colorfmt='rgb', bufferfmt='ubyte')
+                texture = Texture.create(size=(self.frame_tracking.shape[1], self.frame_tracking.shape[0]), colorfmt='rgb')
+                texture.blit_buffer(self.frame_tracking.flatten(), colorfmt='rgb', bufferfmt='ubyte')
 
 
             self.img.texture = texture
