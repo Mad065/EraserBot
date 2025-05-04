@@ -9,25 +9,46 @@ from kivy.uix.label import Label
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.dropdown import DropDown
 from kivy.uix.button import Button
+from kivy.uix.textinput import TextInput
+from kivy.uix.popup import Popup
 from kivy.graphics.texture import Texture
 from kivy.clock import Clock
 
 # TODO Custom buttons
 
-# TODO Programar sistema de grabacion
+# TODO Programar sistema de comunicacion con esp
 
 # App kivy
 class EraserBotApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Layout
         self.main_layout = None
+
+        # Buttons
+        self.fps_button = None
+        self.cam_button = None
+
+        # Video
         self.img = None
+
+        # Variables
         self.cam = None
         self.cap = None
         self.fps = None
-        self.fps_button = None
-        self.cam_button = None
         self.display = None
+
+        # Recording
+        self.recording = None
+        self.video_writer = None
+        self.filename_input = None
+
+        # Capture
+        self.num_capture = None
+
+        # Popup
+        self.popup = None
+
 
     def build(self):
         Window.size = (800, 600)
@@ -39,6 +60,7 @@ class EraserBotApp(App):
         self.cap = cv2.VideoCapture(self.cam)
         self.fps = 30
         self.display = False
+        self.recording = False
 
         Clock.schedule_interval(self.update_img, 1.0 / self.fps)
 
@@ -47,20 +69,25 @@ class EraserBotApp(App):
         return self.main_layout
 
     def control_start(self):
-        # TODO Iniciar a grabar video (se graba con panel blanco y se muestra con video)
-        pass
+        if not self.recording:
+            fourcc = cv2.VideoWriter.fourcc(*'mp4v')
+            self.video_writer = cv2.VideoWriter('video_guardado.avi', fourcc, self.fps, (int(self.cap.get(3)), int(self.cap.get(4))))
+            self.recording = True
+            print("Grabación iniciada...")
 
     def control_pause(self):
-        # TODO Pausar la grabacion del video
-        pass
+        if self.recording:
+            self.recording = False
 
     def control_stop(self):
-        # TODO Detener la grabacion del video
-        pass
+        if self.recording:
+            self.recording = False
+            self.show_filename_popup()
 
     def control_capture(self):
-        # TODO Hacer una captura del video (se captura con panel blanco)
-        pass
+        ret, frame = self.cap.read()
+        self.num_capture += 1
+        cv2.imwrite(f"capture {self.num_capture}", frame)
 
     def control_erase(self):
         # TODO Borrar los trazos en el video y en el pizarron
@@ -80,8 +107,10 @@ class EraserBotApp(App):
     def update_img(self):
         if self.cap.isOpened():
             ret, frame = self.cap.read()
+
             if not ret:
                 print("Error al capturar el frame")
+                return
 
             # Detectar los ArUco markers de las esquinas
             coordenadas, frame_con_aruco, corners, ids = Transformation.detectar_aruco(frame)
@@ -106,6 +135,10 @@ class EraserBotApp(App):
 
             self.img.texture = texture
 
+            # Si esta grabando guardar
+            if self.recording:
+                self.video_writer.write(texture)
+
     def update_fps(self, fps):
         # Establecer texto en fps_button
         self.fps_button.text = str(fps)
@@ -118,6 +151,34 @@ class EraserBotApp(App):
         # Actualizar cam  y cap
         self.cam = cam
         self.cap = cv2.VideoCapture(self.cam)
+
+    def show_filename_popup(self):
+        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        self.filename_input = TextInput(hint_text='Nombre del archivo', multiline=False)
+        save_button = Button(text="Guardar", size_hint=(1, 0.3))
+        layout.add_widget(self.filename_input)
+        layout.add_widget(save_button)
+
+        self.popup = Popup(title="Guardar video", content=layout, size_hint=(None, None), size=(400, 200))
+        save_button.bind(on_press=self.save_video)
+        self.popup.open()
+
+    def save_video(self, instance):
+        filename = self.filename_input.text.strip()
+        if filename == '':
+            filename = 'video_guardado'  # nombre por defecto
+
+        filename += '.mp4'  # Añadir extensión .mp4 si no lo puso
+
+        if self.video_writer is not None:
+            self.video_writer.release()
+            self.video_writer = None
+
+        # Aquí podrías mover/renombrar el archivo temporal, si quieres
+        print(f"Video guardado como: {filename}")
+
+        self.popup.dismiss()
+
 
     def build_main_layout(self):
         self.main_layout = BoxLayout(orientation="vertical")
