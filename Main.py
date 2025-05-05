@@ -1,5 +1,7 @@
+import asyncio
 import cv2
 import numpy as np
+import Connection
 import Tracking
 import Transformation
 from kivy.app import App
@@ -15,8 +17,6 @@ from kivy.graphics.texture import Texture
 from kivy.clock import Clock
 
 # TODO Custom buttons
-
-# TODO Programar sistema de comunicacion con esp
 
 # App kivy
 class EraserBotApp(App):
@@ -92,8 +92,10 @@ class EraserBotApp(App):
         cv2.imwrite(f"capture {self.num_capture}", frame)
 
     def control_erase(self):
-        # TODO Borrar los trazos en el video y en el pizarron
-        pass
+        # Reiniciar trayectoria guardada
+        Tracking.reset_trayectoria()
+        # Borrar en pizarron fisico
+        asyncio.run(Connection.eraser())
 
     def control_display(self):
         self.display = not self.display
