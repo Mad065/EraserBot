@@ -1,6 +1,5 @@
 import asyncio
 import cv2
-import numpy as np
 import Connection
 import Tracking
 import Transformation
@@ -51,7 +50,6 @@ class EraserBotApp(App):
         # Popup
         self.popup = None
 
-
     def build(self):
         Window.size = (800, 600)
 
@@ -88,8 +86,11 @@ class EraserBotApp(App):
 
     def control_capture(self):
         ret, frame = self.cap.read()
-        self.num_capture += 1
-        cv2.imwrite(f"capture {self.num_capture}", frame)
+        if ret:
+            self.num_capture += 1
+            filename = f"capture_{self.num_capture}.jpg"
+            cv2.imwrite(filename, frame)
+            print(f"Captura guardada como {filename}")
 
     def control_erase(self):
         # Reiniciar trayectoria guardada
@@ -108,40 +109,47 @@ class EraserBotApp(App):
     def change_main_layout_display_layout(self):
         pass
 
-    def update_img(self):
-        if self.cap.isOpened():
-            ret, frame = self.cap.read()
+    def update_img(self, dt):  # ahora acepta dt
+        if not self.cap.isOpened():
+            return
 
-            if not ret:
-                print("Error al capturar el frame")
-                return
+        ret, frame = self.cap.read()
+        if not ret:
+            print("Error al capturar el frame")
+            return
 
-            # Detectar los ArUco markers de las esquinas
-            coordenadas, frame_con_aruco, corners, ids = Transformation.detectar_aruco(frame)
+        # 1) Detección de todos los ArUco
+        coordenadas, frame_aruco, corners, ids = Transformation.detectar_aruco(frame)
 
-            # Aplicar la transformación de perspectiva
+        # 2) Transformación de perspectiva solo si tenemos al menos 4 esquinas
+        imagen_transformada = None
+        if coordenadas:
             imagen_transformada = Transformation.transformar_perspectiva(frame, coordenadas, corners)
 
-            # Volver a detectar los aruco en la imagen ya transformada
-            coordenadas, frame_con_aruco, corners, ids = Transformation.detectar_aruco_id(imagen_transformada, 0)
+        # Si la transformación devolvió None, volvemos a usar el frame con ArUco
+        if imagen_transformada is None:
+            imagen_transformada = frame_aruco
 
-            # Tracking del ArUco
-            self.frame_tracking, self.frame_blank = Tracking.tracking(frame_con_aruco, coordenadas, ids)
+        # 3) Detección del ArUco específico en la imagen transformada
+        coordenadas_id, frame_con_id, corners_id, ids_id = Transformation.detectar_aruco_id(imagen_transformada, 0)
 
-            # Crear una textura
-            if self.display:
-                texture = Texture.create(size=(self.frame_blank.shape[1], self.frame_blank.shape[0]), colorfmt='rgb')
-                texture.blit_buffer(self.frame_blank.flatten(), colorfmt='rgb', bufferfmt='ubyte')
-            else:
-                texture = Texture.create(size=(self.frame_tracking.shape[1], self.frame_tracking.shape[0]), colorfmt='rgb')
-                texture.blit_buffer(self.frame_tracking.flatten(), colorfmt='rgb', bufferfmt='ubyte')
+        # 4) Tracking — aquí Tracking.tracking devolverá siempre dos frames válidos
+        self.frame_tracking, self.frame_blank = Tracking.tracking(
+            frame_con_id, coordenadas_id, ids_id
+        )
 
+        # 5) Selección del frame a mostrar
+        show_frame = self.frame_blank if self.display else self.frame_tracking
 
-            self.img.texture = texture
+        # 6) Conversión BGR → RGB y subida a la textura de Kivy
+        rgb = cv2.cvtColor(show_frame, cv2.COLOR_BGR2RGB)
+        texture = Texture.create(size=(rgb.shape[1], rgb.shape[0]), colorfmt='rgb')
+        texture.blit_buffer(rgb.flatten(), colorfmt='rgb', bufferfmt='ubyte')
+        self.img.texture = texture
 
-            # Si esta grabando guardar
-            if self.recording:
-                self.video_writer.write(texture)
+        # 7) Si estamos grabando, escribir el frame original (no la textura)
+        if self.recording and self.video_writer:
+            self.video_writer.write(frame)
 
     def update_fps(self, fps):
         # Establecer texto en fps_button
@@ -183,65 +191,61 @@ class EraserBotApp(App):
 
         self.popup.dismiss()
 
-
     def build_main_layout(self):
         self.main_layout = BoxLayout(orientation="vertical")
-        head_layout = BoxLayout(orientation="horizontal")
-        controls_layout = BoxLayout(orientation="horizontal")
+        head_layout = BoxLayout(orientation="horizontal", size_hint_y=None, height=60)
+        controls_layout = BoxLayout(orientation="horizontal", size_hint_y=None, height=50)
 
-        # Elementos para el head
+        # Título
+        head_title = Label(text="EraserBot", size_hint_x=0.4)
+
+        # Dropdown para FPS
         fps_dropdown = DropDown()
-        head_title = Label(text="EraserBot")
-        cam_dropdown = DropDown()
-
-        # Añadir opciones al fps_dropdown
         for fps_option in ['30 fps', '60 fps']:
             btn = Button(text=fps_option, size_hint_y=None, height=40)
-            btn.bind(on_release=lambda btn: fps_dropdown.select(btn.text))
+            btn.bind(on_release=lambda btn_instance: fps_dropdown.select(btn_instance.text))
             fps_dropdown.add_widget(btn)
 
-        # Botón despliegue fps_button
-        self.fps_button = Button(text='Selecciona la cantidad de fps', size_hint=(None, None), size=(200, 50))
+        self.fps_button = Button(text='fps', size_hint=(None, None), size=(200, 50))
         self.fps_button.bind(on_release=fps_dropdown.open)
-
         fps_dropdown.bind(on_select=lambda instance, value: self.update_fps(fps=value))
 
-        head_layout.add_widget(self.fps_button)
-
-        head_layout.add_widget(head_title)
-
-        # Añadir opciones al cam_dropdown
-        for cam_option in [0, 1, 2, 3, 4, 5]:
-            btn = Button(text=cam_option, size_hint_y=None, height=40)
-            btn.bind(on_release=lambda btn: cam_dropdown.select(btn.text))
+        # Dropdown para cámara
+        cam_dropdown = DropDown()
+        for cam_option in range(6):
+            btn = Button(text=str(cam_option), size_hint_y=None, height=40)
+            btn.bind(on_release=lambda btn_instance: cam_dropdown.select(btn_instance.text))
             cam_dropdown.add_widget(btn)
 
-        # Botón despliegue cam_button
-        self.cam_button = Button(text='Selecciona una camara', size_hint=(None, None), size=(200, 50))
+        self.cam_button = Button(text='cámara', size_hint=(None, None), size=(200, 50))
         self.cam_button.bind(on_release=cam_dropdown.open)
-
         cam_dropdown.bind(on_select=lambda instance, value: self.update_cam(cam=value))
 
+        # Agregar widgets al head_layout
+        head_layout.add_widget(self.fps_button)
+        head_layout.add_widget(head_title)
         head_layout.add_widget(self.cam_button)
 
+        # Agregar head y vista de imagen al layout principal
         self.main_layout.add_widget(head_layout)
 
+        # Asegúrate de tener una propiedad self.img inicializada antes de este método
         self.main_layout.add_widget(self.img)
 
-        # Elementos para los controles
-        start_button = Button(text="Iniciar", size_hint_y=None, height=40, on_press=self.control_start)
-        pause_button = Button(text="Pausar", size_hint_y=None, height=40, on_press=self.control_pause)
-        stop_button = Button(text="Detener", size_hint_y=None, height=40, on_press=self.control_stop)
-        capture_button = Button(text="Captura", size_hint_y=None, height=40, on_press=self.control_capture)
-        erase_button = Button(text="Borrar", size_hint_y=None, height=40, on_press=self.control_erase)
-        display_button = Button(text="Presentar", size_hint_y=None, height=40, on_press=self.control_display)
+        # Botones de control
+        control_buttons = [
+            ("Iniciar", self.control_start),
+            ("Pausar", self.control_pause),
+            ("Detener", self.control_stop),
+            ("Captura", self.control_capture),
+            ("Borrar", self.control_erase),
+            ("Presentar", self.control_display),
+        ]
 
-        controls_layout.add_widget(start_button)
-        controls_layout.add_widget(pause_button)
-        controls_layout.add_widget(stop_button)
-        controls_layout.add_widget(capture_button)
-        controls_layout.add_widget(erase_button)
-        controls_layout.add_widget(display_button)
+        for text, callback in control_buttons:
+            btn = Button(text=text, size_hint_y=None, height=40)
+            btn.bind(on_press=callback)
+            controls_layout.add_widget(btn)
 
         self.main_layout.add_widget(controls_layout)
 
@@ -260,3 +264,6 @@ class EraserBotApp(App):
 
     def on_stop(self):
         self.cap.release()
+
+if __name__ == '__main__':
+    EraserBotApp().run()
