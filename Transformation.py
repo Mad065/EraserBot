@@ -8,9 +8,9 @@ ultima_transformacion = None  # Guarda la última transformación válida
 
 
 # Detectar ArUco markers
-def detectar_aruco(frame):
+def detectar_aruco(frame, dibujar = False):
     " Detecta ArUco markers en un frame y devuelve sus coordenadas. "
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # Si no recive frame da error
     detector = cv2.aruco.ArucoDetector(ARUCO_DICT, PARAMS)
 
     # Detectar ArUco markers
@@ -24,19 +24,20 @@ def detectar_aruco(frame):
                 id_marker = ids[i][0]
                 coordenadas[id_marker] = corners[i][0]  # Guarda los 4 puntos del marcador
 
-                # # Dibujar los bordes del marcador en la imagen original
-                # cv2.polylines(frame, [np.int32(corners[i][0])], True, (0, 255, 0), 2)
-                # centro_x = int(np.mean(corners[i][0][:, 0]))
-                # centro_y = int(np.mean(corners[i][0][:, 1]))
-                # cv2.putText(frame, str(id_marker), (centro_x, centro_y),
-                #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                if dibujar:
+                    # Dibujar los bordes del marcador en la imagen original
+                    cv2.polylines(frame, [np.int32(corners[i][0])], True, (0, 255, 0), 2)
+                    centro_x = int(np.mean(corners[i][0][:, 0]))
+                    centro_y = int(np.mean(corners[i][0][:, 1]))
+                    cv2.putText(frame, str(id_marker), (centro_x, centro_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0),
+                                2)
 
         return coordenadas, frame, corners, ids
 
     return None, frame, None, None
 
 # Detectar ArUco markers
-def detectar_aruco_id(frame, aruco_id):
+def detectar_aruco_id(frame, aruco_id, dibujar = False):
     " Detecta ArUco marker especifico en un frame y devuelve sus coordenadas. "
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     detector = cv2.aruco.ArucoDetector(ARUCO_DICT, PARAMS)
@@ -48,16 +49,17 @@ def detectar_aruco_id(frame, aruco_id):
     if ids is not None:
         coordenadas = {}
         for i in range(len(ids)):
-            if ids[i][0] != aruco_id:
+            if ids[i][0] == aruco_id:
                 id_marker = ids[i][0]
                 coordenadas[id_marker] = corners[i][0]
 
-                # # Dibujar los bordes del marcador en la imagen original
-                # cv2.polylines(frame, [np.int32(corners[i][0])], True, (0, 255, 0), 2)
-                # centro_x = int(np.mean(corners[i][0][:, 0]))
-                # centro_y = int(np.mean(corners[i][0][:, 1]))
-                # cv2.putText(frame, str(id_marker), (centro_x, centro_y),
-                #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                if dibujar:
+                    # Dibujar los bordes del marcador en la imagen original
+                    cv2.polylines(frame, [np.int32(corners[i][0])], True, (0, 255, 0), 2)
+                    centro_x = int(np.mean(corners[i][0][:, 0]))
+                    centro_y = int(np.mean(corners[i][0][:, 1]))
+                    cv2.putText(frame, str(id_marker), (centro_x, centro_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0),
+                                2)
 
         return coordenadas, frame, corners, ids
 
