@@ -43,14 +43,13 @@ while True:
 
 
     # 3) Detección del ArUco específico en la imagen transformada
-    coordenadas_id, frame_con_id, corners_id, ids_id = Transformation.detectar_aruco_id(imagen_transformada, 0, False)
+    coordenadas_id, frame_con_id, corners_id, ids_id = Transformation.detectar_aruco_id(imagen_transformada, 0, True)
     cv2.imshow("Deteccion aruco con id 0", frame_con_id)
 
     # 4) Tracking — aquí Tracking.tracking devolverá siempre dos frames válidos
-    if coordenadas_id:
-        frame_tracking, frame_blank = Tracking.tracking(frame_con_id, coordenadas_id, ids_id)
-        cv2.imshow("Tracking con fondo blanco", frame_blank)
-        cv2.imshow("Tracking con fondo original", frame_tracking)
+    frame_tracking, frame_blank = Tracking.tracking(frame_con_id, coordenadas_id, ids_id)
+    cv2.imshow("Tracking con fondo blanco", frame_blank)
+    cv2.imshow("Tracking con fondo original", frame_tracking)
 
     # Presiona 'q' para salir del bucle
     if cv2.waitKey(1) & 0xFF == ord('q'):
