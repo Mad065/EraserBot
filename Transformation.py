@@ -4,7 +4,6 @@ import numpy as np
 # Cargar el diccionario de ArUco
 ARUCO_DICT = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 PARAMS = cv2.aruco.DetectorParameters()
-ultima_transformacion = None  # Guarda la última transformación válida
 
 
 # Detectar ArUco markers
@@ -148,23 +147,24 @@ def calcular_transformacion_frontal(pts, nuevo_ancho=1000, nuevo_alto=800):
 
 
 # Transformar perspectiva del video
-def transformar_perspectiva(frame, coordenadas, corners):
-    global ultima_transformacion
-
+def obtener_perspectiva(coordenadas):
+    transformation = None
     if coordenadas is not None and len(coordenadas) == 4:
         pts = ordenar_esquinas(coordenadas)
         if pts is not None:
             M, size, dimensiones_reales = calcular_transformacion_frontal(pts)
-            ultima_transformacion = (M, size)  # Guardar transformación válida
+            transformation = (M, size)  # Guardar transformación válida
             print(f"Tamaño real del marcador: {dimensiones_reales} (Ancho, Alto)")
 
-    if ultima_transformacion is not None:
-        M, size = ultima_transformacion
+    return transformation
+
+def aplicar_perspectiva(frame, transformation):
+    if transformation is not None:
+        M, size = transformation
         transformed = cv2.warpPerspective(frame, M, size)
 
         # Aplicar la rotación al video completo
         rotated = cv2.transpose(transformed)  # Transponer la imagen para rotarla 90 grados
 
         return rotated
-
     return None
